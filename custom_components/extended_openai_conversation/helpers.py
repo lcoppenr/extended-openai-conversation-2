@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import partial
 import logging
 import re
-from typing import Any
+from typing import Any, cast
 
 from openai import AsyncAzureOpenAI, AsyncClient, AsyncOpenAI
 
@@ -143,14 +143,16 @@ async def get_authenticated_client(
             azure_endpoint=base_url,
             api_version=api_version,
             organization=organization,
-            http_client=get_async_client(hass),
+            # Legacy HTTPX clients are supported at runtime only.
+            http_client=cast(Any, get_async_client(hass)),
         )
     else:
         client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
             organization=organization,
-            http_client=get_async_client(hass),
+            # Legacy HTTPX clients are supported at runtime only.
+            http_client=cast(Any, get_async_client(hass)),
         )
 
     if skip_authentication:
