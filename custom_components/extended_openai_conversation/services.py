@@ -37,7 +37,11 @@ from .const import (
     SERVICE_QUERY_IMAGE,
     SERVICE_RELOAD_SKILLS,
 )
-from .helpers import get_authenticated_client, get_token_param_for_model
+from .helpers import (
+    get_authenticated_client,
+    get_token_param_for_model,
+    redact_image_data,
+)
 
 QUERY_IMAGE_SCHEMA = vol.Schema(
     {
@@ -98,7 +102,7 @@ async def async_setup_services(hass: HomeAssistant, config: ConfigType) -> None:
                     "content": [{"type": "text", "text": call.data["prompt"]}, *images],
                 }
             ]
-            _LOGGER.info("Prompt for %s: %s", model, messages)
+            _LOGGER.debug("Prompt for %s: %s", model, redact_image_data(messages))
 
             entry = hass.config_entries.async_get_entry(call.data["config_entry"])
             if entry is None:

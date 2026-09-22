@@ -58,7 +58,7 @@ from .const import (
 )
 from .exceptions import FunctionNotFound, ParseArgumentsFailed, TokenLengthExceededError
 from .functions import get_function
-from .helpers import get_model_config
+from .helpers import get_model_config, redact_image_data
 from .schema import adjust_schema
 
 if TYPE_CHECKING:
@@ -398,7 +398,9 @@ class ExtendedOpenAIBaseLLMEntity(Entity):
             if tools and 0 <= max_function_calls <= n_requests:
                 tool_kwargs["tool_choice"] = "none"
 
-            _LOGGER.info("Prompt for %s: %s", model, json.dumps(messages))
+            _LOGGER.debug(
+                "Prompt for %s: %s", model, json.dumps(redact_image_data(messages))
+            )
 
             stream = await self._client.chat.completions.create(
                 messages=messages,
