@@ -21,8 +21,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 import orjson
-import voluptuous as vol
-from voluptuous_openapi import convert
+import probatio
 
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
@@ -60,6 +59,7 @@ from .const import (
 from .exceptions import FunctionNotFound, ParseArgumentsFailed, TokenLengthExceededError
 from .functions import get_function
 from .helpers import get_model_config
+from .schema import adjust_schema
 
 if TYPE_CHECKING:
     from . import ExtendedOpenAIConfigEntry
@@ -77,55 +77,27 @@ def _shorten_tool_call_id(tool_call_id: str) -> str:
     return hashlib.sha256(tool_call_id.encode()).hexdigest()[:9]
 
 
-def _adjust_schema(schema: dict[str, Any]) -> None:
-    """Adjust the schema to be compatible with OpenAI API."""
-    # HA's selector->JSON-schema conversion can emit nodes without an explicit
-    # "type" (notably the root object for an ai_task structure, and enum/anyOf
-    # leaves). Infer it where possible so strict json_schema output still has a
-    # type, and treat genuinely typeless leaves as pass-through.
-    if "type" not in schema:
-        if "properties" in schema:
-            schema["type"] = "object"
-        elif "items" in schema:
-            schema["type"] = "array"
-        else:
-            return
-    if schema["type"] == "object":
-        schema.setdefault("strict", True)
-        schema.setdefault("additionalProperties", False)
-        if "properties" not in schema:
-            return
-
-        if "required" not in schema:
-            schema["required"] = []
-
-        # Ensure all properties are required
-        for prop, prop_info in schema["properties"].items():
-            _adjust_schema(prop_info)
-            if prop not in schema["required"]:
-                if "type" in prop_info:
-                    prop_info["type"] = [prop_info["type"], "null"]
-                schema["required"].append(prop)
-
-    elif schema["type"] == "array":
-        if "items" not in schema:
-            return
-
-        _adjust_schema(schema["items"])
-
-
 def _format_structured_output(
-    schema: vol.Schema, llm_api: llm.APIInstance | None
+    schema: Any, llm_api: llm.APIInstance | None
 ) -> dict[str, Any]:
-    """Format the schema to be compatible with OpenAI API."""
-    result: dict[str, Any] = convert(
+    """Format the schema to be compatible with OpenAI API.
+
+    Home Assistant 2026.9 moved schema serialization from voluptuous-openapi
+    to probatio: llm.selector_serializer now returns probatio's UNSUPPORTED
+    sentinel, which voluptuous_openapi.convert() does not recognize, so every
+    ai_task structure failed. Use probatio.to_openapi like core's
+    openai_conversation does; it accepts both voluptuous schemas (2026.9) and
+    probatio schemas (2026.10+).
+    """
+    result: dict[str, Any] = probatio.to_openapi(
         schema,
         custom_serializer=(
             llm_api.custom_serializer if llm_api else llm.selector_serializer
         ),
+        openapi_version="3.1.0",
     )
 
-    _adjust_schema(result)
+    adjust_schema(result)
 
     return result
 
@@ -317,7 +289,7 @@ class ExtendedOpenAIBaseLLMEntity(Entity):
         exposed_entities: list[dict[str, Any]],
         llm_context: llm.LLMContext | None = None,
         structure_name: str | None = None,
-        structure: vol.Schema | None = None,
+        structure: Any | None = None,
     ) -> None:
         """Generate an answer for the chat log with streaming support."""
         options = self.subentry.data
