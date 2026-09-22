@@ -19,6 +19,7 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.redact import async_redact_data
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -150,7 +151,11 @@ async def async_setup_services(hass: HomeAssistant, config: ConfigType) -> None:
         new_data = entry.data.copy()
         new_data.update(updates)
 
-        _LOGGER.debug("Updating config entry %s with %s", entry_id, new_data)
+        _LOGGER.debug(
+            "Updating config entry %s with %s",
+            entry_id,
+            async_redact_data(new_data, {CONF_API_KEY}),
+        )
 
         base_url = new_data.get(CONF_BASE_URL)
         if base_url == DEFAULT_CONF_BASE_URL:

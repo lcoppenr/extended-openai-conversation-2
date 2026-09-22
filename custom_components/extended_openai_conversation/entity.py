@@ -102,6 +102,43 @@ def _format_structured_output(
     return result
 
 
+def _make_tool_result_content(
+    agent_id: str, tool_call_id: str, tool_name: str, data: dict[str, Any]
+) -> conversation.ToolResultContent:
+    """Build a ToolResultContent for the running Home Assistant version.
+
+    HA 2026.10 wraps the payload in llm.ToolResult (`result=`) and no longer
+    accepts `tool_result=`; HA 2026.9 has no llm.ToolResult. Drop the fallback
+    once the minimum supported HA version has llm.ToolResult.
+    """
+    tool_result_cls = getattr(llm, "ToolResult", None)
+    if tool_result_cls is not None:
+        return conversation.ToolResultContent(  # type: ignore[call-arg,unused-ignore]
+            agent_id=agent_id,
+            tool_call_id=tool_call_id,
+            tool_name=tool_name,
+            result=tool_result_cls(data=data),
+        )
+    return conversation.ToolResultContent(  # type: ignore[call-arg,unused-ignore]
+        agent_id=agent_id,
+        tool_call_id=tool_call_id,
+        tool_name=tool_name,
+        tool_result=data,
+    )
+
+
+def _tool_result_data(content: conversation.ToolResultContent) -> Any:
+    """Return a tool result's payload on HA 2026.9 and 2026.10+.
+
+    On 2026.10+ `tool_result` still exists but is a deprecated alias that
+    logs a warning on every access, so read `result.data` when present.
+    """
+    result = getattr(content, "result", None)
+    if result is not None:
+        return result.data
+    return content.tool_result
+
+
 def _render_extra_body(
     extra_body_raw: str, hass: HomeAssistant, model: str
 ) -> dict[str, Any] | None:
@@ -249,7 +286,7 @@ def _convert_content_to_param(
                     "tool_call_id": _shorten_tool_call_id(content.tool_call_id)
                     if shorten_tool_call_id
                     else content.tool_call_id,
-                    "content": orjson.dumps(content.tool_result).decode(),
+                    "content": orjson.dumps(_tool_result_data(content)).decode(),
                 }
             )
 
@@ -589,11 +626,11 @@ class ExtendedOpenAIBaseLLMEntity(Entity):
                 self.hass, function_config, arguments, llm_context, exposed_entities
             )
 
-        return conversation.ToolResultContent(
+        return _make_tool_result_content(
             agent_id=self.entity_id,
             tool_call_id=tool_input.id,
             tool_name=tool_input.tool_name,
-            tool_result={"result": str(result)},
+            data={"result": str(result)},
         )
 
     def should_run_in_background(self, arguments: dict[str, Any]) -> bool:
