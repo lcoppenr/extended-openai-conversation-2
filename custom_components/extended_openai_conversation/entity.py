@@ -79,6 +79,17 @@ def _shorten_tool_call_id(tool_call_id: str) -> str:
 
 def _adjust_schema(schema: dict[str, Any]) -> None:
     """Adjust the schema to be compatible with OpenAI API."""
+    # HA's selector->JSON-schema conversion can emit nodes without an explicit
+    # "type" (notably the root object for an ai_task structure, and enum/anyOf
+    # leaves). Infer it where possible so strict json_schema output still has a
+    # type, and treat genuinely typeless leaves as pass-through.
+    if "type" not in schema:
+        if "properties" in schema:
+            schema["type"] = "object"
+        elif "items" in schema:
+            schema["type"] = "array"
+        else:
+            return
     if schema["type"] == "object":
         schema.setdefault("strict", True)
         schema.setdefault("additionalProperties", False)
@@ -92,7 +103,8 @@ def _adjust_schema(schema: dict[str, Any]) -> None:
         for prop, prop_info in schema["properties"].items():
             _adjust_schema(prop_info)
             if prop not in schema["required"]:
-                prop_info["type"] = [prop_info["type"], "null"]
+                if "type" in prop_info:
+                    prop_info["type"] = [prop_info["type"], "null"]
                 schema["required"].append(prop)
 
     elif schema["type"] == "array":
