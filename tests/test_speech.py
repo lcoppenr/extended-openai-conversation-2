@@ -249,6 +249,12 @@ def _tts_entity(client: MagicMock, data: dict | None = None):
     return ExtendedOpenAITTSEntity(_entry(client, subentry), subentry)
 
 
+def test_tts_entity_is_named_after_subentry():
+    """The TTS manager needs a name; it comes from the subentry title."""
+    entity = _tts_entity(MagicMock())
+    assert entity.name == "tts entry"
+
+
 async def test_tts_stream_one_header_then_pcm_per_sentence():
     """Each sentence is synthesized separately behind a single WAV header."""
     entity = _tts_entity(MagicMock())

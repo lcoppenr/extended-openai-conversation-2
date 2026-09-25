@@ -141,6 +141,9 @@ class ExtendedOpenAITTSEntity(tts.TextToSpeechEntity, ExtendedOpenAIBaseLLMEntit
 
     entry: ExtendedOpenAIConfigEntry
 
+    # Home Assistant's TTS manager refuses an engine without a name, so the
+    # entity is named after the subentry instead of inheriting the device name.
+    _attr_has_entity_name = False
     _attr_supported_languages = SPEECH_LANGUAGES
     # Unused, but required by the base class; the model follows the text.
     _attr_default_language = "en-US"
@@ -154,6 +157,11 @@ class ExtendedOpenAITTSEntity(tts.TextToSpeechEntity, ExtendedOpenAIBaseLLMEntit
         self._voices: list[tts.Voice] = [
             tts.Voice(voice, voice) for voice in OPENAI_VOICES
         ]
+
+    @property
+    def name(self) -> str:
+        """Return the subentry title as the entity name."""
+        return self.subentry.title
 
     @cached_property
     def default_options(self) -> dict[str, Any]:
