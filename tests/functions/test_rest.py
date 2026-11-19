@@ -55,3 +55,31 @@ class TestRestFunctionYaml:
             assert result is not None
             assert "Seoul" in result
             mock_rest_data.async_update.assert_called_once()
+
+    async def test_each_call_renders_its_own_resource(
+        self, hass, function, exposed_entities, llm_context
+    ):
+        """A second call with new arguments does not reuse the first URL."""
+        function_tool = prepare_function_tool_from_yaml("rest_example.yaml")
+        function_config = function_tool["function"]
+
+        with patch(
+            "custom_components.extended_openai_conversation.functions.web.rest.create_rest_data_from_config"
+        ) as mock_create_rest:
+            mock_rest_data = AsyncMock()
+            mock_rest_data.data_without_xml = MagicMock(return_value=None)
+            mock_create_rest.return_value = mock_rest_data
+
+            for city in ("Seoul", "Paris"):
+                await function.execute(
+                    hass,
+                    function_config,
+                    {"city": city, "country_code": "XX"},
+                    llm_context,
+                    exposed_entities,
+                )
+
+        resources = [c.args[1]["resource"] for c in mock_create_rest.call_args_list]
+        assert "Seoul" in resources[0]
+        assert "Paris" in resources[1]
+        assert "resource_template" in function_config

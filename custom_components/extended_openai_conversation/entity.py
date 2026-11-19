@@ -21,8 +21,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 import orjson
-import voluptuous as vol
-from voluptuous_openapi import convert
+import probatio
 
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
@@ -59,7 +58,8 @@ from .const import (
 )
 from .exceptions import FunctionNotFound, ParseArgumentsFailed, TokenLengthExceededError
 from .functions import get_function
-from .helpers import get_model_config
+from .helpers import get_model_config, redact_image_data
+from .schema import adjust_schema
 
 if TYPE_CHECKING:
     from . import ExtendedOpenAIConfigEntry
@@ -77,45 +77,66 @@ def _shorten_tool_call_id(tool_call_id: str) -> str:
     return hashlib.sha256(tool_call_id.encode()).hexdigest()[:9]
 
 
-def _adjust_schema(schema: dict[str, Any]) -> None:
-    """Adjust the schema to be compatible with OpenAI API."""
-    if schema["type"] == "object":
-        schema.setdefault("strict", True)
-        schema.setdefault("additionalProperties", False)
-        if "properties" not in schema:
-            return
-
-        if "required" not in schema:
-            schema["required"] = []
-
-        # Ensure all properties are required
-        for prop, prop_info in schema["properties"].items():
-            _adjust_schema(prop_info)
-            if prop not in schema["required"]:
-                prop_info["type"] = [prop_info["type"], "null"]
-                schema["required"].append(prop)
-
-    elif schema["type"] == "array":
-        if "items" not in schema:
-            return
-
-        _adjust_schema(schema["items"])
-
-
 def _format_structured_output(
-    schema: vol.Schema, llm_api: llm.APIInstance | None
+    schema: Any, llm_api: llm.APIInstance | None
 ) -> dict[str, Any]:
-    """Format the schema to be compatible with OpenAI API."""
-    result: dict[str, Any] = convert(
+    """Format the schema to be compatible with OpenAI API.
+
+    Home Assistant 2026.9 moved schema serialization from voluptuous-openapi
+    to probatio: llm.selector_serializer now returns probatio's UNSUPPORTED
+    sentinel, which voluptuous_openapi.convert() does not recognize, so every
+    ai_task structure failed. Use probatio.to_openapi like core's
+    openai_conversation does; it accepts both voluptuous schemas (2026.9) and
+    probatio schemas (2026.10+).
+    """
+    result: dict[str, Any] = probatio.to_openapi(
         schema,
         custom_serializer=(
             llm_api.custom_serializer if llm_api else llm.selector_serializer
         ),
+        openapi_version="3.1.0",
     )
 
-    _adjust_schema(result)
+    adjust_schema(result)
 
     return result
+
+
+def _make_tool_result_content(
+    agent_id: str, tool_call_id: str, tool_name: str, data: dict[str, Any]
+) -> conversation.ToolResultContent:
+    """Build a ToolResultContent for the running Home Assistant version.
+
+    HA 2026.10 wraps the payload in llm.ToolResult (`result=`) and no longer
+    accepts `tool_result=`; HA 2026.9 has no llm.ToolResult. Drop the fallback
+    once the minimum supported HA version has llm.ToolResult.
+    """
+    tool_result_cls = getattr(llm, "ToolResult", None)
+    if tool_result_cls is not None:
+        return conversation.ToolResultContent(  # type: ignore[call-arg,unused-ignore]
+            agent_id=agent_id,
+            tool_call_id=tool_call_id,
+            tool_name=tool_name,
+            result=tool_result_cls(data=data),
+        )
+    return conversation.ToolResultContent(  # type: ignore[call-arg,unused-ignore]
+        agent_id=agent_id,
+        tool_call_id=tool_call_id,
+        tool_name=tool_name,
+        tool_result=data,
+    )
+
+
+def _tool_result_data(content: conversation.ToolResultContent) -> Any:
+    """Return a tool result's payload on HA 2026.9 and 2026.10+.
+
+    On 2026.10+ `tool_result` still exists but is a deprecated alias that
+    logs a warning on every access, so read `result.data` when present.
+    """
+    result = getattr(content, "result", None)
+    if result is not None:
+        return result.data
+    return content.tool_result
 
 
 def _render_extra_body(
@@ -265,7 +286,7 @@ def _convert_content_to_param(
                     "tool_call_id": _shorten_tool_call_id(content.tool_call_id)
                     if shorten_tool_call_id
                     else content.tool_call_id,
-                    "content": orjson.dumps(content.tool_result).decode(),
+                    "content": orjson.dumps(_tool_result_data(content)).decode(),
                 }
             )
 
@@ -305,7 +326,7 @@ class ExtendedOpenAIBaseLLMEntity(Entity):
         exposed_entities: list[dict[str, Any]],
         llm_context: llm.LLMContext | None = None,
         structure_name: str | None = None,
-        structure: vol.Schema | None = None,
+        structure: Any | None = None,
     ) -> None:
         """Generate an answer for the chat log with streaming support."""
         options = self.subentry.data
@@ -414,7 +435,9 @@ class ExtendedOpenAIBaseLLMEntity(Entity):
             if tools and 0 <= max_function_calls <= n_requests:
                 tool_kwargs["tool_choice"] = "none"
 
-            _LOGGER.info("Prompt for %s: %s", model, json.dumps(messages))
+            _LOGGER.debug(
+                "Prompt for %s: %s", model, json.dumps(redact_image_data(messages))
+            )
 
             stream = await self._client.chat.completions.create(
                 messages=messages,
@@ -603,11 +626,11 @@ class ExtendedOpenAIBaseLLMEntity(Entity):
                 self.hass, function_config, arguments, llm_context, exposed_entities
             )
 
-        return conversation.ToolResultContent(
+        return _make_tool_result_content(
             agent_id=self.entity_id,
             tool_call_id=tool_input.id,
             tool_name=tool_input.tool_name,
-            tool_result={"result": str(result)},
+            data={"result": str(result)},
         )
 
     def should_run_in_background(self, arguments: dict[str, Any]) -> bool:

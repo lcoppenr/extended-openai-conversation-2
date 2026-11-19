@@ -30,7 +30,7 @@ from .template import async_setup_templates, async_unload_templates
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.AI_TASK, Platform.CONVERSATION]
+PLATFORMS = [Platform.AI_TASK, Platform.CONVERSATION, Platform.STT, Platform.TTS]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 type ExtendedOpenAIConfigEntry = ConfigEntry[AsyncClient]

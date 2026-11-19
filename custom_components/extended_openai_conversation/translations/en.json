@@ -88,6 +88,44 @@
                     }
                 }
             }
+        },
+        "stt": {
+            "entry_type": "Speech-to-text",
+            "initiate_flow": {
+                "reconfigure": "Reconfigure speech-to-text",
+                "user": "Add speech-to-text"
+            },
+            "step": {
+                "init": {
+                    "data": {
+                        "name": "Name",
+                        "chat_model": "Model"
+                    }
+                }
+            },
+            "abort": {
+                "entry_not_loaded": "Cannot add or change this while the integration is not loaded."
+            }
+        },
+        "tts": {
+            "entry_type": "Text-to-speech",
+            "initiate_flow": {
+                "reconfigure": "Reconfigure text-to-speech",
+                "user": "Add text-to-speech"
+            },
+            "step": {
+                "init": {
+                    "data": {
+                        "name": "Name",
+                        "chat_model": "Model",
+                        "voice": "Voice",
+                        "speed": "Speed"
+                    }
+                }
+            },
+            "abort": {
+                "entry_not_loaded": "Cannot add or change this while the integration is not loaded."
+            }
         }
     },
     "services": {

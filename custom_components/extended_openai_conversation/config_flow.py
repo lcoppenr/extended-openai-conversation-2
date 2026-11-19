@@ -54,6 +54,8 @@ from .const import (
     CONF_SKIP_AUTHENTICATION,
     CONF_TEMPERATURE,
     CONF_TOP_P,
+    CONF_TTS_SPEED,
+    CONF_TTS_VOICE,
     CONTEXT_TRUNCATE_STRATEGIES,
     DEFAULT_ADVANCED_OPTIONS,
     DEFAULT_AI_TASK_NAME,
@@ -74,8 +76,12 @@ from .const import (
     DEFAULT_SERVICE_TIER,
     DEFAULT_SHORTEN_TOOL_CALL_ID,
     DEFAULT_SKIP_AUTHENTICATION,
+    DEFAULT_STT_NAME,
+    DEFAULT_STT_OPTIONS,
     DEFAULT_TEMPERATURE,
     DEFAULT_TOP_P,
+    DEFAULT_TTS_NAME,
+    DEFAULT_TTS_OPTIONS,
     DOMAIN,
     REASONING_EFFORT_OPTIONS,
     SERVICE_TIER_OPTIONS,
@@ -219,6 +225,8 @@ class ExtendedOpenAIConversationConfigFlow(ConfigFlow, domain=DOMAIN):
         return {
             "conversation": ExtendedOpenAISubentryFlowHandler,
             "ai_task_data": ExtendedOpenAIAITaskSubentryFlowHandler,
+            "stt": ExtendedOpenAISTTSubentryFlowHandler,
+            "tts": ExtendedOpenAITTSSubentryFlowHandler,
         }
 
 
@@ -677,3 +685,87 @@ class ExtendedOpenAIAITaskSubentryFlowHandler(ConfigSubentryFlow):
                 vol.Schema(schema), self.options
             ),
         )
+
+
+class ExtendedOpenAISpeechSubentryFlowHandler(ConfigSubentryFlow):
+    """Base flow for speech subentries: a name plus a single options form."""
+
+    default_name: str
+    default_options: dict[str, Any]
+    options: dict[str, Any]
+
+    @property
+    def _is_new(self) -> bool:
+        """Return if this is a new subentry."""
+        return self.source == "user"
+
+    def _schema(self) -> dict:
+        """Return the options fields."""
+        return {vol.Optional(CONF_CHAT_MODEL): str}
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Add a subentry."""
+        self.options = dict(self.default_options)
+        return await self.async_step_init()
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Handle reconfiguration of a subentry."""
+        self.options = dict(self._get_reconfigure_subentry().data)
+        return await self.async_step_init()
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Manage the options."""
+        if self._get_entry().state != ConfigEntryState.LOADED:
+            return self.async_abort(reason="entry_not_loaded")
+
+        if user_input is not None:
+            if self._is_new:
+                title = user_input.pop(CONF_NAME, self.default_name)
+                return self.async_create_entry(title=title, data=user_input)
+            return self.async_update_and_abort(
+                self._get_entry(),
+                self._get_reconfigure_subentry(),
+                data=user_input,
+            )
+
+        schema: dict = {}
+        if self._is_new:
+            schema[vol.Optional(CONF_NAME, default=self.default_name)] = str
+        schema.update(self._schema())
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(schema), self.options
+            ),
+        )
+
+
+class ExtendedOpenAISTTSubentryFlowHandler(ExtendedOpenAISpeechSubentryFlowHandler):
+    """Flow for managing speech-to-text subentries."""
+
+    default_name = DEFAULT_STT_NAME
+    default_options = DEFAULT_STT_OPTIONS
+
+
+class ExtendedOpenAITTSSubentryFlowHandler(ExtendedOpenAISpeechSubentryFlowHandler):
+    """Flow for managing text-to-speech subentries."""
+
+    default_name = DEFAULT_TTS_NAME
+    default_options = DEFAULT_TTS_OPTIONS
+
+    def _schema(self) -> dict:
+        """Return the options fields."""
+        return {
+            vol.Optional(CONF_CHAT_MODEL): str,
+            vol.Optional(CONF_TTS_VOICE): str,
+            vol.Optional(CONF_TTS_SPEED): NumberSelector(
+                NumberSelectorConfig(min=0.25, max=4.0, step=0.05)
+            ),
+        }

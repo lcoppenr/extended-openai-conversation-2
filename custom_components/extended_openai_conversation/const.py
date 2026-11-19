@@ -4,6 +4,8 @@ DOMAIN = "extended_openai_conversation"
 DEFAULT_NAME = "Extended OpenAI Conversation"
 DEFAULT_CONVERSATION_NAME = "Extended OpenAI Conversation"
 DEFAULT_AI_TASK_NAME = "Extended OpenAI AI Task"
+DEFAULT_STT_NAME = "Extended OpenAI STT"
+DEFAULT_TTS_NAME = "Extended OpenAI TTS"
 
 CONF_ORGANIZATION = "organization"
 CONF_BASE_URL = "base_url"
@@ -293,6 +295,87 @@ DEFAULT_AI_TASK_OPTIONS = {
     CONF_CHAT_MODEL: DEFAULT_CHAT_MODEL,
     CONF_MAX_TOKENS: DEFAULT_MAX_TOKENS,
     CONF_ADVANCED_OPTIONS: DEFAULT_ADVANCED_OPTIONS,
+}
+
+# Languages offered by the speech-to-text and text-to-speech entities; the same
+# list Home Assistant's own OpenAI integration uses. OpenAI-compatible speech
+# models may support fewer. The model detects the language itself.
+SPEECH_LANGUAGES = [
+    "af-ZA",  # Afrikaans
+    "ar-SA",  # Arabic
+    "hy-AM",  # Armenian
+    "az-AZ",  # Azerbaijani
+    "be-BY",  # Belarusian
+    "bs-BA",  # Bosnian
+    "bg-BG",  # Bulgarian
+    "ca-ES",  # Catalan
+    "zh-CN",  # Chinese (Mandarin)
+    "hr-HR",  # Croatian
+    "cs-CZ",  # Czech
+    "da-DK",  # Danish
+    "nl-NL",  # Dutch
+    "en-US",  # English
+    "et-EE",  # Estonian
+    "fi-FI",  # Finnish
+    "fr-FR",  # French
+    "gl-ES",  # Galician
+    "de-DE",  # German
+    "el-GR",  # Greek
+    "he-IL",  # Hebrew
+    "hi-IN",  # Hindi
+    "hu-HU",  # Hungarian
+    "is-IS",  # Icelandic
+    "id-ID",  # Indonesian
+    "it-IT",  # Italian
+    "ja-JP",  # Japanese
+    "kn-IN",  # Kannada
+    "kk-KZ",  # Kazakh
+    "ko-KR",  # Korean
+    "lv-LV",  # Latvian
+    "lt-LT",  # Lithuanian
+    "mk-MK",  # Macedonian
+    "ms-MY",  # Malay
+    "mr-IN",  # Marathi
+    "mi-NZ",  # Maori
+    "ne-NP",  # Nepali
+    "no-NO",  # Norwegian
+    "fa-IR",  # Persian
+    "pl-PL",  # Polish
+    "pt-PT",  # Portuguese
+    "ro-RO",  # Romanian
+    "ru-RU",  # Russian
+    "sr-RS",  # Serbian
+    "sk-SK",  # Slovak
+    "sl-SI",  # Slovenian
+    "es-ES",  # Spanish
+    "sw-KE",  # Swahili
+    "sv-SE",  # Swedish
+    "fil-PH",  # Tagalog (Filipino)
+    "ta-IN",  # Tamil
+    "th-TH",  # Thai
+    "tr-TR",  # Turkish
+    "uk-UA",  # Ukrainian
+    "ur-PK",  # Urdu
+    "vi-VN",  # Vietnamese
+    "cy-GB",  # Welsh
+]
+
+# Speech-to-text defaults
+DEFAULT_STT_MODEL = "gpt-4o-mini-transcribe"
+DEFAULT_STT_OPTIONS = {
+    CONF_CHAT_MODEL: DEFAULT_STT_MODEL,
+}
+
+# Text-to-speech defaults
+CONF_TTS_VOICE = "voice"
+CONF_TTS_SPEED = "speed"
+DEFAULT_TTS_MODEL = "gpt-4o-mini-tts"
+DEFAULT_TTS_VOICE = "alloy"
+DEFAULT_TTS_SPEED = 1.0
+DEFAULT_TTS_OPTIONS = {
+    CONF_CHAT_MODEL: DEFAULT_TTS_MODEL,
+    CONF_TTS_VOICE: DEFAULT_TTS_VOICE,
+    CONF_TTS_SPEED: DEFAULT_TTS_SPEED,
 }
 
 # Skill System Constants

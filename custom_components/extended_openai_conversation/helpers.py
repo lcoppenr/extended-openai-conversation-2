@@ -26,6 +26,23 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def redact_image_data(messages: Any) -> Any:
+    """Return a copy of chat messages with inline image data replaced for logging.
+
+    Image attachments are sent as base64 data URLs; logging them verbatim puts
+    whole camera frames into the Home Assistant log.
+    """
+    if isinstance(messages, dict):
+        redacted = {key: redact_image_data(value) for key, value in messages.items()}
+        url = redacted.get("url")
+        if isinstance(url, str) and url.startswith("data:"):
+            redacted["url"] = f"{url.split(',', 1)[0]},<{len(url)} chars redacted>"
+        return redacted
+    if isinstance(messages, list):
+        return [redact_image_data(item) for item in messages]
+    return messages
+
+
 AZURE_DOMAIN_PATTERN = r"\.(openai\.azure\.com|azure-api\.net|services\.ai\.azure\.com)"
 
 

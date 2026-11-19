@@ -34,6 +34,10 @@ def get_rest_data(
     hass: HomeAssistant, rest_config: dict[str, Any], arguments: dict[str, Any]
 ) -> rest.data.RestData:
     """Create RestData from config with template rendering."""
+    # Render into a copy: the function config is reused for every call, so
+    # replacing its templates with rendered values would make each later
+    # call hit the first call's URL and payload.
+    rest_config = dict(rest_config)
     rest_config.setdefault(CONF_METHOD, rest.const.DEFAULT_METHOD)
     rest_config.setdefault(CONF_VERIFY_SSL, rest.const.DEFAULT_VERIFY_SSL)
     rest_config.setdefault(CONF_TIMEOUT, rest.data.DEFAULT_TIMEOUT)
